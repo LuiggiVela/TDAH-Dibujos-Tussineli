@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Análisis de TDAH — Herramienta interactiva</title>
+  <style>
+    :root{--accent:#4f46e5;--muted:#6b7280;--bg:#f8fafc}
+    body{font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; margin:0; background:var(--bg); color:#0f172a}
+    .container{max-width:980px;margin:32px auto;padding:24px;background:white;border-radius:12px;box-shadow:0 6px 20px rgba(12,18,29,0.06)}
+    header{display:flex;gap:16px;align-items:center}
+    h1{font-size:22px;margin:0}
+    p.lead{color:var(--muted);margin:6px 0 18px}
+    .grid{display:grid;grid-template-columns:1fr 360px;gap:20px}
+    .card{padding:18px;border-radius:10px;background:#fff}
+    label{display:block;margin:10px 0 4px;font-weight:600}
+    .hint{color:var(--muted);font-size:13px}
+    .question{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f1f5f9}
+    .score-input{width:80px}
+    .btn{display:inline-block;padding:10px 14px;border-radius:8px;background:var(--accent);color:white;text-decoration:none;border:none;cursor:pointer}
+    .muted{color:var(--muted)}
+    .result{margin-top:12px;padding:12px;border-radius:8px;background:#f1f5f9}
+    .scale{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+    .scale span{padding:6px 8px;border-radius:6px;background:#fff;border:1px solid #e6eefc;font-size:13px}
+    footer{margin-top:18px;color:var(--muted);font-size:13px}
+    @media(max-width:900px){.grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <h1>Análisis rápido de TDAH (herramienta educativa)</h1>
+        <p class="lead">Formulario interactivo para evaluar síntomas comunes de TDAH en adultos/jóvenes. Esto NO reemplaza evaluación clínica profesional.</p>
+      </div>
+    </header>
+
+    <div class="grid">
+      <main class="card">
+        <section>
+          <h2>Instrucciones</h2>
+          <p class="hint">Lee cada afirmación y elige con qué frecuencia experimentas ese síntoma en las últimas 6 meses. Usa la escala 0 (Nunca) — 3 (Muy a menudo).</p>
+        </section>
+
+        <section id="question-list" style="margin-top:12px">
+          <!-- Preguntas base (adaptadas de criterios clínicos para orientación) -->
+        </section>
+
+        <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button id="calc" class="btn">Calcular puntuación</button>
+          <button id="reset" class="btn" style="background:#ef4444">Reiniciar</button>
+          <button id="export" class="btn" style="background:#0ea5a4">Exportar JSON</button>
+          <div id="saved" class="muted" style="margin-left:12px"></div>
+        </div>
+
+        <div id="result" class="result" aria-live="polite" style="display:none">
+          <h3>Resultado</h3>
+          <p id="scoreText"></p>
+          <div id="interpretation"></div>
+        </div>
+
+      </main>
+
+      <aside class="card">
+        <h3>Detalles</h3>
+        <p class="muted">Esta herramienta es orientativa y educativa. Para diagnóstico y tratamiento dirígete a un profesional de salud mental o neurólogo.</p>
+
+        <h4 style="margin-top:12px">Escala</h4>
+        <div class="scale">
+          <span>0 — Nunca</span>
+          <span>1 — A veces</span>
+          <span>2 — Frecuente</span>
+          <span>3 — Muy frecuente</span>
+        </div>
+
+        <h4 style="margin-top:12px">Interpretación rápida</h4>
+        <ul class="muted">
+          <li><strong>0–15:</strong> Bajo nivel de síntomas</li>
+          <li><strong>16–30:</strong> Síntomas moderados — considerar evaluación</li>
+          <li><strong>&gt;30:</strong> Síntomas significativos — acudir a evaluación clínica</li>
+        </ul>
+
+        <h4 style="margin-top:12px">Recursos</h4>
+        <p class="muted">Contacta a especialistas en salud mental. Puedes guardar o exportar resultados para compartir con tu médico.</p>
+      </aside>
+    </div>
+
+    <footer>
+      <p>Plantilla creada para uso educativo — no es diagnóstico médico.</p>
+    </footer>
+  </div>
+
+  <script>
+    // Lista de preguntas (comunes en escalas de síntomas de TDAH) -- 12 ítems para ejemplo
+    const preguntas = [
+      'A menudo no presto atención a los detalles o cometo errores por descuido en tareas.',
+      'Me cuesta mantener la atención en tareas o actividades durante mucho tiempo.',
+      'Parezco no escuchar cuando me hablan directamente.',
+      'A menudo no sigo instrucciones y no termino tareas.',
+      'Tengo dificultad para organizar tareas o actividades.',
+      'Evito o me disgusta realizar tareas que requieren esfuerzo mental sostenido.',
+      'Pierdo cosas necesarias para tareas (llaves, teléfono, documentos).',
+      'Me distraigo fácilmente con estímulos externos.',
+      'Me resulta difícil permanecer sentado cuando se espera.',
+      'Hablar en exceso o interrumpir a otros.',
+      'Tengo dificultades para esperar mi turno.',
+      'Actúo impulsivamente sin pensar en las consecuencias.'
+    ];
+
+    const qList = document.getElementById('question-list');
+
+    preguntas.forEach((q, i) => {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'question';
+      wrapper.innerHTML = `
+        <div style="flex:1">
+          <label for="q${i}">${i+1}. ${q}</label>
+          <div class="hint">Selecciona la frecuencia</div>
+        </div>
+        <div style="width:120px;text-align:right">
+          <select id="q${i}" class="score-input" aria-label="Pregunta ${i+1}">
+            <option value="0">0 — Nunca</option>
+            <option value="1">1 — A veces</option>
+            <option value="2">2 — Frecuente</option>
+            <option value="3">3 — Muy frecuente</option>
+          </select>
+        </div>
+      `;
+      qList.appendChild(wrapper);
+    });
+
+    function interpretar(total){
+      const container = document.getElementById('interpretation');
+      container.innerHTML = '';
+      const p = document.createElement('p');
+      p.className = 'muted';
+      if(total <= 15) p.textContent = `Puntuación ${total}: Nivel bajo de síntomas. Si tienes dudas, vigila la evolución.`;
+      else if(total <= 30) p.textContent = `Puntuación ${total}: Síntomas moderados. Se recomienda evaluación clínica.`;
+      else p.textContent = `Puntuación ${total}: Síntomas significativos. Consulta a un profesional para diagnóstico.`;
+      container.appendChild(p);
+
+      // Sugerencias básicas
+      const ul = document.createElement('ul'); ul.className = 'muted';
+      ul.innerHTML = `
+        <li>Considera llevar un registro de síntomas por 2-4 semanas.</li>
+        <li>Prueba técnicas de organización, rutinas y límites de tiempo.</li>
+        <li>Si afecta funcionalidad (trabajo/estudios/relaciones), busca evaluación especializada.</li>
+      `;
+      container.appendChild(ul);
+    }
+
+    document.getElementById('calc').addEventListener('click', () => {
+      let total = 0; const answers = [];
+      for(let i=0;i<preguntas.length;i++){
+        const v = Number(document.getElementById('q'+i).value);
+        answers.push({pregunta: preguntas[i], puntaje: v});
+        total += v;
+      }
+      document.getElementById('result').style.display = 'block';
+      document.getElementById('scoreText').textContent = `Puntuación total: ${total} (máx ${preguntas.length*3})`;
+      interpretar(total);
+      // guardar en localStorage con timestamp
+      const record = {fecha: new Date().toISOString(), total, answers};
+      localStorage.setItem('tdah_last', JSON.stringify(record));
+      document.getElementById('saved').textContent = 'Último guardado localmente.';
+    });
+
+    document.getElementById('reset').addEventListener('click', () => {
+      for(let i=0;i<preguntas.length;i++) document.getElementById('q'+i).value = '0';
+      document.getElementById('result').style.display = 'none';
+      document.getElementById('saved').textContent = '';
+    });
+
+    document.getElementById('export').addEventListener('click', () => {
+      const raw = localStorage.getItem('tdah_last');
+      if(!raw){ alert('No hay resultados guardados. Pulsa "Calcular puntuación" primero.'); return; }
+      const blob = new Blob([raw], {type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'tdah_result.json'; document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    });
+
+    // Cargar último guardado (si existe)
+    window.addEventListener('load', () => {
+      const raw = localStorage.getItem('tdah_last');
+      if(!raw) return;
+      const r = JSON.parse(raw);
+      r.answers.forEach((ans, i)=>{
+        const el = document.getElementById('q'+i);
+        if(el) el.value = String(ans.puntaje);
+      });
+      document.getElementById('result').style.display = 'block';
+      document.getElementById('scoreText').textContent = `Puntuación total: ${r.total} (máx ${preguntas.length*3})`;
+      interpretar(r.total);
+      document.getElementById('saved').textContent = 'Último guardado localmente.';
+    });
+  </script>
+</body>
+</html>
